@@ -31,7 +31,24 @@ BUREAU_COLS_NEEDED = [ ... ]           # Copy from app.py
 
 @st.cache_data 
 def load_available_client_ids(app_file_name: str = "application_test.csv") -> list:
-    """Docstring..."""
+    """
+    Loads unique SK_ID_CURR values from the specified application CSV file.
+
+    This function is cached by Streamlit, meaning it only executes the file
+    reading and processing once for a given `app_file_name`, reusing the
+    result on subsequent calls within the same session or if inputs don't change.
+    It reads only the 'SK_ID_CURR' column to minimize memory usage.
+
+    Args:
+        app_file_name (str, optional): The name of the CSV file (e.g., 
+            "application_test.csv" or "application_train.csv") located in the 
+            `DATA_PATH` directory. Defaults to "application_test.csv".
+
+    Returns:
+        list: A sorted list of unique client IDs (SK_ID_CURR). Returns an
+              empty list if the file is not found, is empty, the 'SK_ID_CURR'
+              column is missing, or any other error occurs during loading.
+    """
     # (Function code remains the same, but ensure DATA_PATH is accessible)
     try:
         file_path = os.path.join(DATA_PATH, app_file_name) # Uses DATA_PATH from this file
@@ -54,7 +71,25 @@ def load_available_client_ids(app_file_name: str = "application_test.csv") -> li
 
 
 def prepare_df_for_json(df_orig: pd.DataFrame) -> list:
-    """Docstring..."""
+    """
+    Prepares a Pandas DataFrame for safe JSON serialization.
+
+    This function handles common data cleaning tasks required before converting
+    a DataFrame to a JSON-compatible format (list of dictionaries):
+    1. Replaces string representations of NaN/Infinity (e.g., "NaN", "inf") 
+       in object columns with `np.nan`.
+    2. Replaces Python's `np.inf` and `-np.inf` in numeric columns with `np.nan`.
+    3. Converts all `np.nan` values to Python's `None`, as `None` is serialized 
+       to `null` in JSON, while `np.nan` is not directly JSON serializable.
+
+    Args:
+        df_orig (pd.DataFrame): The input DataFrame to prepare. Can be None or empty.
+
+    Returns:
+        list: A list of dictionaries, where each dictionary represents a row from
+              the prepared DataFrame. Returns an empty list if `df_orig` is None
+              or empty.
+    """
     # (Function code remains the same)
     if df_orig is None or df_orig.empty:
         return [] 
@@ -73,7 +108,35 @@ def prepare_df_for_json(df_orig: pd.DataFrame) -> list:
 
 @st.cache_data 
 def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | None]:
-    """Docstring..."""
+    """
+    Loads, filters, and prepares data from all 7 source CSV files for a single selected client.
+
+    This function performs the crucial task of assembling the necessary raw data slices
+    for the specified `client_id`. It uses predefined `_COLS_NEEDED` lists to load
+    only the essential columns from each CSV, optimizing memory usage. The loaded
+    and filtered data is then prepared into a dictionary format suitable for sending
+    as a JSON payload to the prediction API.
+
+    The function is cached by Streamlit, so for a given `client_id`, the expensive
+    file I/O and filtering operations are performed only once per session or
+    if the underlying data files were to change (which they don't in this context).
+
+    Args:
+        client_id (int): The `SK_ID_CURR` of the client for whom data needs to be fetched.
+
+    Returns:
+        tuple[dict | None, pd.DataFrame | None]: 
+            - The first element is `api_payload` (dict): A dictionary where keys are
+              the names of the 7 tables (e.g., "current_app", "bureau") and values
+              are lists of records (dictionaries) representing the filtered data for
+              that table, ready for JSON serialization. Returns `None` if a critical
+              error occurs during data loading (e.g., a file is not found).
+            - The second element is `client_main_descriptive_df` (pd.DataFrame):
+              A DataFrame containing the raw row(s) for the `client_id` from the
+              `application_test.csv` (or `application_train.csv`) file, used for
+              displaying general descriptive information. Returns `None` if a
+              critical error occurs.
+    """
     # (Function code remains the same, but ensure DATA_PATH and _COLS_NEEDED lists are accessible)
     # This function now relies on the _COLS_NEEDED lists defined in this utils.py file
     data_frames_for_payload = {}
@@ -109,8 +172,22 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
 
 def call_prediction_api(payload_dict: dict, api_url_param: str) -> dict | None:
     """
-    Docstring...
-    Now takes api_url_param as an argument.
+    Sends the prepared data payload to the prediction API and returns the response.
+
+    This function makes a POST request to the configured `API_URL` with the
+    provided `payload_dict` (which should be a dictionary of table names to
+    lists of records). It handles common HTTP request errors, connection issues,
+    timeouts, and issues with JSON decoding of the API's response.
+
+    Args:
+        payload_dict (dict): The data payload to send to the API. This dictionary
+                             is expected to be JSON serializable.
+
+    Returns:
+        dict | None: The parsed JSON response from the API if the request is
+                      successful and the response is valid JSON. Returns `None`
+                      if any error occurs during the API call (e.g., timeout,
+                      connection error, HTTP error status, JSON decoding error).
     """
     # (Function code remains the same, but uses api_url_param)
     if not api_url_param: 
