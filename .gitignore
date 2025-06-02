@@ -1,0 +1,53 @@
+# Data files (ignore all CSVs as requested)
+*.csv
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*build*/
+*develop-eggs*/
+*dist*/
+*downloads*/
+*eggs*/
+*.egg-info/
+*parts*/
+*sdist*/
+*var*/
+*wheels*/
+*.egg
+instance/
+pip-wheel-metadata/
+share/python-wheels/
+*.manifest
+*.spec
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# MLflow
+mlruns/
+# If you have other MLflow artifacts or local DBs you don't want to commit:
+# mlflow.db
+
+# Data (if very large and not meant for the repo - you seem to have a data/ folder)
+# If your data/ folder contains very large CSVs (>100MB total),
+# consider if they should be in the repo or managed via Git LFS or downloaded separately.
+# For now, let's assume you want to track them if they are not excessively huge
+# or if they are sample data. If they are the *full large datasets*, reconsider.
+# data/  # Uncomment this if you DON'T want to commit data/
+
+# IDE / Editor specific
+.vscode/
+.idea/
+*.DS_Store
+
+# Other
+*.log
+local_settings.py
