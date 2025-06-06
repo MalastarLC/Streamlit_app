@@ -104,25 +104,32 @@ CREDIT_CARD_BALANCE_COLS_NEEDED = [
 # --- END OF _COLS_NEEDED LISTS ---
 
 # --- 2. MAIN APPLICATION LAYOUT AND LOGIC ---
-st.set_page_config(layout="wide", page_title="Dashboard Scoring Crédit P7")
-st.title("🏦 Dashboard Interactif de Scoring Crédit")
+st.set_page_config(layout="wide", 
+                   page_title="Dashboard Scoring Crédit P8", 
+                   initial_sidebar_state="expanded", 
+                   menu_items={ 
+                       'About': "Please select the application id on the sidebar's dropdown list to see the the application result"
+                        }
+                    )
+st.title('Prêt à dépenser : Outil de "scoring crédit"')
 st.markdown("---") 
 
-st.sidebar.header("👨‍💼 Sélection du Client")
+st.sidebar.header("Sélection de l'ID de la demande de crédit")
 available_ids = load_available_client_ids() 
 
 if not available_ids:
-    st.error("Impossible de charger la liste des IDs clients. L'application ne peut pas continuer. Vérifiez la configuration des données et les logs.")
+    st.error("Impossible de charger la liste des IDs. L'application ne peut pas continuer. Vérifiez la configuration des données et les logs.")
     st.stop() 
 
 selected_client_id = int(st.sidebar.selectbox(
-    label="Choisissez un ID Client:",  
+    label="Choisissez un ID de demande:",  
     options=available_ids,            
     index=0                           
 ))
 
 if selected_client_id:
-    st.header(f"🔍 Analyse Détaillée du Client ID: {selected_client_id}")
+    st.header(f"Analyse Détaillée du Client ID: {selected_client_id}")
+    #st.header(f"🔍 Analyse Détaillée du Client ID: {selected_client_id}")
     with st.spinner(f"Chargement et préparation des données pour le client {selected_client_id}... (Merci de patienter)"):
         client_api_payload, client_main_info_df = get_data_for_client(selected_client_id)
 
@@ -157,7 +164,7 @@ if selected_client_id:
         st.warning(f"Impossible d'estimer la taille du payload : {e_payload_size}")
 
     with st.spinner("Calcul du score via l'API... (Cette opération peut prendre quelques instants)"):
-        api_response_data = call_prediction_api(client_api_payload)
+        api_response_data = call_prediction_api(client_api_payload, API_URL)
 
     if api_response_data:
         try:
