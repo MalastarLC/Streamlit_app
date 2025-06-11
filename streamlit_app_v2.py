@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 import requests
 
-from utils import load_available_client_ids, get_data_for_client, call_prediction_api, create_gauge_chart
+from utils import load_available_client_ids, get_data_for_client, call_prediction_api, create_gauge_chart, load_all_clients_data
 
 
 
@@ -173,13 +173,29 @@ def show_home_dashboard():
                                 else:
                                     st.error(f"{decision}")
                             
+                            #Middle part
+                            st.markdown("---")
+                            col1, col2 = st.columns(2)                           
                             #Gauge plot
-                            st.markdown("---") 
-                            gauge_graph = create_gauge_chart(raw_score_from_api, OPTIMAL_THRESHOLD_SCORE)
-                            st.plotly_chart(gauge_graph, use_container_width=True)
-                            # st.progress(probabilite_de_remboursement/100)
+                            with col1:
+                                gauge_graph = create_gauge_chart(raw_score_from_api, OPTIMAL_THRESHOLD_SCORE)
+                                st.plotly_chart(gauge_graph, use_container_width=True)
+                                # st.progress(probabilite_de_remboursement/100)                                                      
+                            with col2:
+                                st.markdown(
+                                    "Explication du score :  \n"
+                                    "  \n"
+                                    "  \n"
+                                    "  \n"
+                                    "Pour une demande donnée l'application prédit un score de risque.  \n"
+                                    "Ce score représente la probabilité sur 100 d'un risque de défaut.  \n"
+                                    "  \n"
+                                    "Le graphique à gauche permet de situer le score attribué au client  \n"
+                                    "au seuil de risque limite accepté pour une demande de prêt.  \n"
+                                )                            
 
 
+                            #Lower part
                             st.markdown("---") 
                             #st.caption(f"Probabilité de remboursement Le seuil de décision pour 'Crédit Accordé' implique une probabilité de remboursement > {((100-OPTIMAL_THRESHOLD_SCORE)/100):.2%}.")
                             st.markdown("#### Interprétation du score:")
@@ -187,14 +203,14 @@ def show_home_dashboard():
                                 st.write(
                                     f"Le score du client est de **{raw_score_from_api:.2f}** pour cette application. "
                                     f"Ce score est **inférieur** au seuil de refus de {OPTIMAL_THRESHOLD_SCORE:.2f}. "
-                                    f"Cela correspond à une probabilité de remboursement estimée à **{probabilite_de_defaut:.0%}**. "
+                                    f"Cela correspond à une probabilité de remboursement estimée à **{probabilite_de_remboursement/100:.2%}**. "
                                     "Sur la base de ces éléments, la demande de crédit est **acceptée**."
                                 )
                             else: 
                                 st.write(
-                                    f"Après analyse ce client a été attribué un score de **{raw_score_from_api:.2f}**. "
+                                    f"Le score du client est de **{raw_score_from_api:.2f}** pour cette application. "
                                     f"Ce score est **supérieur ou égal** au seuil de refus de {OPTIMAL_THRESHOLD_SCORE:.2f}. "
-                                    f"Cela correspond à une probabilité de défaut estimée à **{probabilite_de_defaut:.0%}** (ou une probabilité de remboursement de seulement {probabilite_de_remboursement:.0%}). "
+                                    f"Cela correspond à une probabilité de défaut estimée à **{probabilite_de_remboursement/100:.2%}**. "
                                     "Sur la base de ces éléments, la demande de crédit est **refusée**."
                                 )
 
@@ -211,6 +227,99 @@ def show_home_dashboard():
                     st.json(api_response_data) 
             else: 
                 st.warning("Aucune réponse (ou une erreur) n'a été reçue de l'API pour le calcul du score. Vérifiez les messages d'erreur précédents et l'état de l'API.")
+
+def show_informations_relatives_au_client():
+
+    st.title("Informations relatives au client")
+    st.markdown("---") 
+
+    st.sidebar.header("Sélection de l'ID de la demande de crédit")
+    available_ids = load_available_client_ids() 
+
+    if not available_ids:
+        st.error("Impossible de charger la liste des IDs. L'application ne peut pas continuer. Vérifiez la configuration des données et les logs.")
+        st.stop() 
+
+    selected_client_id = int(st.sidebar.selectbox(
+        label="Choisissez un ID:",  
+        options=available_ids,            
+        index=0                           
+    ))
+
+    if selected_client_id:
+        st.header(f"Analyse Détaillée du Client ID: {selected_client_id}")
+        #st.header(f"🔍 Analyse Détaillée du Client ID: {selected_client_id}")
+        with st.spinner(f"Chargement et préparation des données pour le client {selected_client_id}... (Merci de patienter)"):
+            client_api_payload, client_main_info_df = get_data_for_client(selected_client_id)
+
+        if client_api_payload is None or client_main_info_df is None:
+            st.warning("Les informations ne peuvent pas être affichées car les données du client n'ont pas pu être chargées. Veuillez vérifier les messages d'erreur ci-dessus.")
+            st.stop() 
+
+        st.subheader("Informations Descriptives Générales du Client")
+        if not client_main_info_df.empty:
+            display_series = client_main_info_df.iloc[0].copy()
+            if 'DAYS_BIRTH' in display_series and pd.notna(display_series['DAYS_BIRTH']):
+                display_series['AGE_ANNÉES'] = abs(int(display_series['DAYS_BIRTH'] // 365))
+            if 'DAYS_EMPLOYED' in display_series and pd.notna(display_series['DAYS_EMPLOYED']):
+                if display_series['DAYS_EMPLOYED'] < 200000: 
+                    display_series['ANNÉES_EMPLOI'] = abs(int(display_series['DAYS_EMPLOYED'] // 365))
+                else:
+                    display_series['ANNÉES_EMPLOI'] = "N/A (ou Erreur Donnée)"
+            st.dataframe(
+                pd.DataFrame(display_series).rename(columns={display_series.name: "Valeur"}).astype(str),
+                use_container_width=True 
+            )
+    else:
+        st.write("Aucune information descriptive principale trouvée pour ce client dans application_test.csv.")
+    st.markdown("---")
+
+def show_graphiques_informations_relatives_au_client():
+
+    st.title("Informations relatives au client")
+    st.markdown("---") 
+
+    st.sidebar.header("Sélection de l'ID de la demande de crédit")
+    available_ids = load_available_client_ids() 
+
+    if not available_ids:
+        st.error("Impossible de charger la liste des IDs. L'application ne peut pas continuer. Vérifiez la configuration des données et les logs.")
+        st.stop() 
+
+    selected_client_id = int(st.sidebar.selectbox(
+        label="Choisissez un ID:",  
+        options=available_ids,            
+        index=0                           
+    ))
+
+    if selected_client_id:
+        st.header(f"Analyse Détaillée du Client ID: {selected_client_id}")
+        #st.header(f"🔍 Analyse Détaillée du Client ID: {selected_client_id}")
+        with st.spinner(f"Chargement et préparation des données pour le client {selected_client_id}... (Merci de patienter)"):
+            client_api_payload, client_main_info_df = get_data_for_client(selected_client_id)
+
+        if client_api_payload is None or client_main_info_df is None:
+            st.warning("Les informations ne peuvent pas être affichées car les données du client n'ont pas pu être chargées. Veuillez vérifier les messages d'erreur ci-dessus.")
+            st.stop() 
+
+        st.subheader("Informations Descriptives Générales du Client")
+        if not client_main_info_df.empty:
+            display_series = client_main_info_df.iloc[0].copy()
+            if 'DAYS_BIRTH' in display_series and pd.notna(display_series['DAYS_BIRTH']):
+                display_series['AGE_ANNÉES'] = abs(int(display_series['DAYS_BIRTH'] // 365))
+            if 'DAYS_EMPLOYED' in display_series and pd.notna(display_series['DAYS_EMPLOYED']):
+                if display_series['DAYS_EMPLOYED'] < 200000: 
+                    display_series['ANNÉES_EMPLOI'] = abs(int(display_series['DAYS_EMPLOYED'] // 365))
+                else:
+                    display_series['ANNÉES_EMPLOI'] = "N/A (ou Erreur Donnée)"
+            st.dataframe(
+                pd.DataFrame(display_series).rename(columns={display_series.name: "Valeur"}).astype(str),
+                use_container_width=True 
+            )
+    else:
+        st.write("Aucune information descriptive principale trouvée pour ce client dans application_test.csv.")
+    st.markdown("---") 
+ 
 
 def show_documentation_page():
     st.title("Documentation")
@@ -236,13 +345,16 @@ def show_about_page():
 # --- 4. MAIN APP LOGIC WITH NAVIGATION ---
 
 # Define the navigation bar
-page = st_navbar(["Home", "Documentation", "About"])
+page = st_navbar(["Home", "Informations client", "Graphiques client", "Documentation", "About"])
 
-# Control the flow of the app based on the selected page
+# Page selection
 if page == "Home":
     show_home_dashboard()
+elif page == "Graphiques client":
+    show_graphiques_informations_relatives_au_client()
+elif page == "Informations client":
+    show_informations_relatives_au_client()
 elif page == "Documentation":
     show_documentation_page()
 elif page == "About":
     show_about_page()
-# You can add more pages here with 'elif page == "New Page":'

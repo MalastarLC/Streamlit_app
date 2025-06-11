@@ -427,3 +427,75 @@ def create_gauge_chart(score, threshold):
     )
     
     return fig
+
+
+
+# --- NOUVEAU CODE POUR LES GRAPHIQUES DE COMPARAISON ---
+
+# Dictionnaire associant des noms lisibles aux noms de colonnes techniques.
+COMPARISON_COLS = {
+    # Variables Numériques
+    'Revenu Total': 'AMT_INCOME_TOTAL',
+    'Montant du Crédit': 'AMT_CREDIT',
+    'Prix du Bien': 'AMT_GOODS_PRICE',
+    'Âge du client (années)': 'AGE_ANNÉES',
+    'Années d\'emploi': 'ANNÉES_EMPLOI',
+    'Nombre d\'enfants': 'CNT_CHILDREN',
+    # Variables Catégorielles
+
+    'Genre': 'CODE_GENDER',
+    'Type de prêt' : 'NAME_CONTRACT_TYPE',
+    'Niveau d\'éducation': 'NAME_EDUCATION_TYPE',
+    'Statut Familial': 'NAME_FAMILY_STATUS',
+    'Possède une voiture': 'FLAG_OWN_CAR'
+}
+
+@st.cache_data
+def load_all_clients_data(app_file_name: str = "application_test.csv"):
+    """
+    Charge les données descriptives pour tous les clients depuis application_test.csv.
+    Calcule également l'âge et les années d'emploi pour la comparaison.
+    Cette fonction est mise en cache pour des performances optimales.
+
+    Args:
+        app_file_name (str): Le nom du fichier CSV.
+
+    Returns:
+        pd.DataFrame: Un DataFrame contenant les données de tous les clients.
+                      Retourne un DataFrame vide en cas d'erreur.
+    """
+
+    # Pas d'aggrégation ducoup NaNs ne devraient pas causer d'erreurs et Plotly ignorera juste les NaNs dans les graphiques
+
+    try:
+        # On ne charge que les colonnes nécessaires, y compris celles pour les calculs.
+        cols_to_load = list(set(COMPARISON_COLS.values()) - {'AGE_ANNÉES', 'ANNÉES_EMPLOI'})
+        cols_to_load.extend(['DAYS_BIRTH', 'DAYS_EMPLOYED', 'SK_ID_CURR', 'NAME_FAMILY_STATUS', 'CODE_GENDER'])
+        
+        # S'assurer qu'il n'y a pas de doublons
+        cols_to_load = list(set(cols_to_load))
+
+        file_path = os.path.join(DATA_PATH, app_file_name)
+        df_all = pd.read_csv(file_path, usecols=cols_to_load)
+
+        # --- Création de features simples pour la comparaison ---
+        # Calcul de l'âge
+        if 'DAYS_BIRTH' in df_all.columns:
+            df_all['AGE_ANNÉES'] = df_all['DAYS_BIRTH'].abs() // 365
+            df_all.loc[df_all['AGE_ANNÉES'] > 100, 'AGE_ANNÉES'] = np.nan #traite anomalies
+
+        # Calcul des années d'emploi
+        if 'DAYS_EMPLOYED' in df_all.columns:
+            # Gérer la valeur anormale pour le chômage/retraite
+            df_all['ANNÉES_EMPLOI'] = df_all['DAYS_EMPLOYED'].abs() // 365
+            # Marquer la valeur anormale comme NaN pour ne pas fausser les graphiques
+            df_all.loc[df_all['ANNÉES_EMPLOI'] > 80, 'ANNÉES_EMPLOI'] = np.nan # Traite anomalies
+
+        return df_all
+
+    except FileNotFoundError:
+        st.error(f"Le fichier de données '{file_path}' n'a pas été trouvé pour les graphiques de comparaison.")
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Une erreur est survenue lors du chargement des données de tous les clients : {e}")
+        return pd.DataFrame()
