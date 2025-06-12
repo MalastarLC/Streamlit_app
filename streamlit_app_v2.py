@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 import requests
 
-from utils import load_available_client_ids, get_data_for_client, call_prediction_api, create_gauge_chart, load_all_clients_data
+from utils import load_available_client_ids, get_data_for_client, call_prediction_api, create_gauge_chart, load_all_clients_data, COMPARISON_COLS
 
 
 
@@ -276,49 +276,154 @@ def show_informations_relatives_au_client():
 
 def show_graphiques_informations_relatives_au_client():
 
-    st.title("Informations relatives au client")
+
+    # --- PARTIE 1 : Initialisation de la Page ---
+    st.title("Graphiques de Comparaison Client")
+    st.markdown("Comparez les informations du client sélectionné à celles d'autres groupes de clients.")
     st.markdown("---") 
 
-    st.sidebar.header("Sélection de l'ID de la demande de crédit")
+    # --- PARTIE 2 : Sélection du Client (avec Mémoire de Session) ---
+    st.sidebar.header("Sélection du Client")
     available_ids = load_available_client_ids() 
 
     if not available_ids:
-        st.error("Impossible de charger la liste des IDs. L'application ne peut pas continuer. Vérifiez la configuration des données et les logs.")
+        st.error("Impossible de charger la liste des IDs.")
         st.stop() 
+
+    # Utiliser st.session_state pour garder l'ID sélectionné en mémoire entre les pages
+    if 'selected_client_id' not in st.session_state: 
+        st.session_state.selected_client_id = available_ids[0]
+
+    # Callback pour mettre à jour l'état de la session lorsque qu'un nouvel id est sélectionné
+    def update_client_id_state():
+        st.session_state.selected_client_id = st.session_state.sidebar_client_id_for_graphs
 
     selected_client_id = int(st.sidebar.selectbox(
         label="Choisissez un ID:",  
-        options=available_ids,            
-        index=0                           
+        options=available_ids,
+        key='sidebar_client_id_for_graphs', # Une clé unique pour ce widget
+        on_change=update_client_id_state, #Des qu'"un client est choisi fonction update_client_id_state appelée ce qui met notre id en mémoire dans la session state
+        # L'index est défini par l'ID actuellement en mémoire
+        index=available_ids.index(st.session_state.selected_client_id) #st.session_state.selected_client_id recupere l'id puis .index() recupere son index dans la liste puis index = valeur de la position dans la liste
     ))
 
-    if selected_client_id:
-        st.header(f"Analyse Détaillée du Client ID: {selected_client_id}")
-        #st.header(f"🔍 Analyse Détaillée du Client ID: {selected_client_id}")
-        with st.spinner(f"Chargement et préparation des données pour le client {selected_client_id}... (Merci de patienter)"):
-            client_api_payload, client_main_info_df = get_data_for_client(selected_client_id)
+    # --- Chargement des Données ---
+    with st.spinner(f"Chargement des données pour le client {selected_client_id} et l'ensemble des applications"):
+        # Données spécifiques au client sélectionné
+        _, client_main_info_df = get_data_for_client(selected_client_id) # _ sert a stocker notre api_payload dans une variable "poubelle" car on n'en a besoin que pour la page home ou la prédiction est faite
+        # Données de tous les clients pour la comparaison (rapide grâce au cache)
+        all_clients_df = load_all_clients_data()
 
-        if client_api_payload is None or client_main_info_df is None:
-            st.warning("Les informations ne peuvent pas être affichées car les données du client n'ont pas pu être chargées. Veuillez vérifier les messages d'erreur ci-dessus.")
-            st.stop() 
+    if client_main_info_df is None or all_clients_df.empty:
+        st.warning("Les données n'ont pas pu être chargées. Les graphiques ne peuvent pas être affichés.")
+        st.stop()
 
-        st.subheader("Informations Descriptives Générales du Client")
-        if not client_main_info_df.empty:
-            display_series = client_main_info_df.iloc[0].copy()
-            if 'DAYS_BIRTH' in display_series and pd.notna(display_series['DAYS_BIRTH']):
-                display_series['AGE_ANNÉES'] = abs(int(display_series['DAYS_BIRTH'] // 365))
-            if 'DAYS_EMPLOYED' in display_series and pd.notna(display_series['DAYS_EMPLOYED']):
-                if display_series['DAYS_EMPLOYED'] < 200000: 
-                    display_series['ANNÉES_EMPLOI'] = abs(int(display_series['DAYS_EMPLOYED'] // 365))
-                else:
-                    display_series['ANNÉES_EMPLOI'] = "N/A (ou Erreur Donnée)"
-            st.dataframe(
-                pd.DataFrame(display_series).rename(columns={display_series.name: "Valeur"}).astype(str),
-                use_container_width=True 
+    st.header(f"Analyse comparative pour le Client ID: {selected_client_id}")
+
+    # --- PARTIE 4 : Interface de Sélection pour la Comparaison ---
+    col1, col2 = st.columns(2)
+    with col1:
+        # L'utilisateur choisit la variable à visualiser
+        selected_variable_label = st.selectbox(
+            "Choisir une variable à comparer :",
+            options=list(COMPARISON_COLS.keys()) # Utilise les noms lisibles
+        )
+        # On récupère le vrai nom de la colonne
+        variable_to_compare = COMPARISON_COLS[selected_variable_label]
+    
+    with col2:
+        # L'utilisateur choisit le groupe de comparaison
+        comparison_group_label = st.radio(
+            "Comparer à :",
+            options=["L'ensemble des clients", "Clients avec un statut familial similaire", "Clients du même genre"],
+            key="comparison_group"
+        )
+    
+    # --- PARTIE 5 : Logique de Filtrage du Groupe de Comparaison ---
+    client_series = client_main_info_df.iloc[0] #when you select a single row, Pandas "pivots" that row. The original column names become the new index of the Series. Si on vait mis [[0]] à la place on aurait eu un DataFrame
+                                                #its "easier" to use as a series because you can use it like a dictionnary with a key and a vlaue and not have to deal with the constraints of using a DatAFrame
+    comparison_df = all_clients_df.copy() # Copie du DataFrame avec les colonnes de comparaison pour tout les clients de application_test
+
+    if comparison_group_label == "Clients avec un statut familial similaire":
+        client_status = client_series.get('NAME_FAMILY_STATUS')
+        if client_status:
+            comparison_df = all_clients_df[all_clients_df['NAME_FAMILY_STATUS'] == client_status]
+            st.info(f"Filtre appliqué : comparaison avec les {len(comparison_df)} clients dont le statut est '{client_status}'.")
+
+    elif comparison_group_label == "Clients du même genre":
+        client_gender = client_series.get('CODE_GENDER')
+        if client_gender and client_gender != 'XNA':
+            comparison_df = all_clients_df[all_clients_df['CODE_GENDER'] == client_gender]
+            st.info(f"Filtre appliqué : comparaison avec les {len(comparison_df)} clients de genre '{client_gender}'.")
+
+    # --- PARTIE 6 : Génération et Affichage du Graphique ---
+    st.subheader(f"Distribution de : {selected_variable_label}")
+    
+    # Obtenir la valeur spécifique du client sélectionné pour la variable choisie
+    client_value = client_series.get(variable_to_compare)
+
+    # Détecter si la variable est numérique ou catégorielle pour choisir le bon graphique
+    if pd.api.types.is_numeric_dtype(comparison_df[variable_to_compare]): #vérifie si la colonne que l'utilisateur a choisi de comparer contient des nombres ou du texte. En fonction du résultat, elle choisit le bon type de graphique.
+        # --- Graphique pour Variable NUMÉRIQUE (Histogramme) ---
+        fig = go.Figure()
+
+        # Trace 1: L'histogramme de la distribution du groupe
+        fig.add_trace(go.Histogram(
+            x=comparison_df[variable_to_compare].dropna(), # .dropna() est une sécurité
+            name='Distribution du groupe',
+            marker_color='#1f77b4', # Bleu
+            opacity=0.75
+        ))
+
+        # Trace 2: La ligne verticale pour le client sélectionné
+        if pd.notna(client_value):
+            fig.add_vline(
+                x=client_value,
+                line_width=3,
+                line_dash="dash",
+                line_color="red",
+                annotation_text=f"Client {selected_client_id}",
+                annotation_position="top right"
             )
+        
+        fig.update_layout(
+            title_text=f"Distribution de '{selected_variable_label}'",
+            xaxis_title=selected_variable_label,
+            yaxis_title="Nombre de clients",
+            template="plotly_dark",
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        if pd.isna(client_value):
+            st.warning(f"La valeur pour '{selected_variable_label}' n'est pas disponible pour ce client.")
+
     else:
-        st.write("Aucune information descriptive principale trouvée pour ce client dans application_test.csv.")
-    st.markdown("---") 
+        # --- Graphique pour Variable CATÉGORIELLE (Diagramme en barres) ---
+        counts = comparison_df[variable_to_compare].value_counts()
+        
+        # Mettre en évidence la barre du client en rouge
+        colors = ['red' if cat == client_value else '#1f77b4' for cat in counts.index]
+
+        fig = go.Figure(go.Bar(
+            x=counts.index,
+            y=counts.values,
+            marker_color=colors,
+            text=counts.values,
+            textposition='outside'
+        ))
+
+        fig.update_layout(
+            title_text=f"Répartition par '{selected_variable_label}'",
+            xaxis_title=selected_variable_label,
+            yaxis_title="Nombre de clients",
+            template="plotly_dark",
+            xaxis={'categoryorder':'total descending'} # Ordonner les barres par taille
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        if pd.notna(client_value):
+            st.markdown(f"Le client **{selected_client_id}** appartient à la catégorie **<span style='color:red; font-weight:bold;'>{client_value}</span>**.", unsafe_allow_html=True)
+        else:
+            st.warning(f"La catégorie pour '{selected_variable_label}' n'est pas disponible pour ce client.")
+
  
 
 def show_documentation_page():
