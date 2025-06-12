@@ -3,3 +3,6 @@ streamlit-navigation-bar==3.3.0
 pandas
 numpy
 requests
+boto3
+s3fs
+plotly
