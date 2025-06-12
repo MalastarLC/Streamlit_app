@@ -4,7 +4,7 @@ import streamlit as st # Still needed for @st.cache_data and st.error
 import pandas as pd
 import numpy as np
 import requests
-import os
+# import os Plus besoin car on va lire depuis le service S3 de AWS
 import plotly.graph_objects as go
 # import json # Not directly used by these functions but by app.py for payload size
 
@@ -17,7 +17,12 @@ import plotly.graph_objects as go
 
 # OPTION A: Redefine constants needed by utils.py within utils.py
 # (This can lead to duplication if app.py also needs them for other things)
-DATA_PATH = "data/" 
+
+
+# DATA_PATH = "data/" Plus besoin car on va lire depuis le service S3 de AWS 
+
+S3_BUCKET_NAME = "p8-credit-scoring-dashboard-data-2025" # Nom du bucket S3
+
 # API_URL is used by call_prediction_api - better to pass it as an argument from app.py
 
 # The _COLS_NEEDED lists are heavily used by get_data_for_client
@@ -25,6 +30,8 @@ DATA_PATH = "data/"
 # They could be defined here, or app.py could pass them as arguments.
 # For simplicity of this example, let's assume they are defined here for now
 # ... and so on for all _COLS_NEEDED lists
+
+
 
 APPLICATION_TEST_COLS_NEEDED = [
     'AMT_ANNUITY', 'AMT_CREDIT', 'AMT_GOODS_PRICE', 'AMT_INCOME_TOTAL', 
@@ -229,9 +236,23 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
 
     try:
         # --- 1. current_app (from application_test.csv) ---
+
+        list_of_paths = [
+                        's3://p8-credit-scoring-dashboard-data-2025/data/application_test.csv',
+                        's3://p8-credit-scoring-dashboard-data-2025/data/bureau.csv',
+                        's3://p8-credit-scoring-dashboard-data-2025/data/bureau_balance.csv',
+                        's3://p8-credit-scoring-dashboard-data-2025/data/previous_application.csv',
+                        's3://p8-credit-scoring-dashboard-data-2025/data/POS_CASH_balance.csv',
+                        's3://p8-credit-scoring-dashboard-data-2025/data/installments_payments.csv',
+                        's3://p8-credit-scoring-dashboard-data-2025/data/credit_card_balance.csv'
+                        ]
+
+
+
         df_app_test_full = pd.read_csv(
-            os.path.join(DATA_PATH, "application_test.csv"), 
-            usecols=APPLICATION_TEST_COLS_NEEDED 
+            #os.path.join(DATA_PATH, "application_test.csv"), 
+            list_of_paths[0],
+            usecols=APPLICATION_TEST_COLS_NEEDED
         )
         client_main_descriptive_df = df_app_test_full[df_app_test_full['SK_ID_CURR'] == client_id]
         if client_main_descriptive_df.empty:
@@ -241,7 +262,7 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
 
         # --- 2. bureau.csv ---
         df_bureau_full = pd.read_csv(
-            os.path.join(DATA_PATH, "bureau.csv"), 
+            list_of_paths[1],
             usecols=BUREAU_COLS_NEEDED
         )
         client_bureau_df = df_bureau_full[df_bureau_full['SK_ID_CURR'] == client_id]
@@ -254,7 +275,7 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
         # --- 3. bureau_balance.csv ---
         if client_sk_id_bureau_list: 
             df_bureau_balance_full = pd.read_csv(
-                os.path.join(DATA_PATH, "bureau_balance.csv"), 
+                list_of_paths[2], 
                 usecols=BUREAU_BALANCE_COLS_NEEDED
             )
             client_bureau_balance_df = df_bureau_balance_full[
@@ -266,7 +287,7 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
 
         # --- 4. previous_application.csv ---
         df_prev_app_full = pd.read_csv(
-            os.path.join(DATA_PATH, "previous_application.csv"), 
+            list_of_paths[3], 
             usecols=PREVIOUS_APPLICATION_COLS_NEEDED
         )
         client_prev_app_df = df_prev_app_full[df_prev_app_full['SK_ID_CURR'] == client_id]
@@ -278,7 +299,7 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
 
         # --- 5. POS_CASH_balance.csv ---
         df_pos_cash_full = pd.read_csv(
-            os.path.join(DATA_PATH, "POS_CASH_balance.csv"), 
+            list_of_paths[4], 
             usecols=POS_CASH_BALANCE_COLS_NEEDED
         )
         filter_pos_by_curr = df_pos_cash_full['SK_ID_CURR'] == client_id
@@ -290,7 +311,7 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
         
         # --- 6. installments_payments.csv ---
         df_installments_full = pd.read_csv(
-            os.path.join(DATA_PATH, "installments_payments.csv"), 
+            list_of_paths[5], 
             usecols=INSTALLMENTS_PAYMENTS_COLS_NEEDED
         )
         filter_install_by_curr = df_installments_full['SK_ID_CURR'] == client_id
@@ -302,7 +323,7 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
 
         # --- 7. credit_card_balance.csv ---
         df_credit_card_full = pd.read_csv(
-            os.path.join(DATA_PATH, "credit_card_balance.csv"), 
+            list_of_paths[6], 
             usecols=CREDIT_CARD_BALANCE_COLS_NEEDED
         )
         filter_cc_by_curr = df_credit_card_full['SK_ID_CURR'] == client_id
