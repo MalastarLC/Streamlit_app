@@ -10,6 +10,14 @@ import requests
 
 from utils import load_available_client_ids, get_data_for_client, call_prediction_api, create_gauge_chart, load_all_clients_data, COMPARISON_COLS
 
+# Notes avant de commencer 
+# Lorsqu'un utilisateur intéragit avec un widget streamlit et c'est une particularité de la librairie :
+# Le script tout entier est relancé du début à la fin
+# Dans notre cas, si l'on change l'ID dans le selectbox ou que l'on sélectionne une nouvelle variable de comparaison, le script est immédiatement relancé.
+# Cette nouvelle exécution permet de mettre à jour la valeur de st.session_state.selected_client_id grâce à la ligne d'assignation qui est st.session_state.selected_client_id =
+# Le script utilise ensuite cette nouvelle valeur pour afficher les bonnes informations.
+# Pendant ce temps, les fonctions marquées avec @st.cache_data ne sont pas ré-exécutées si leurs arguments n'ont pas changé, ce qui permet de garder l'application rapide.
+
 
 
 API_URL = "https://credit-scoring-api-p5ym.onrender.com/predict"
@@ -125,20 +133,8 @@ def show_home_dashboard():
     st.title('Prêt à dépenser : Outil de "scoring crédit"')
     st.markdown("---") 
 
-    st.sidebar.header("Sélection de l'ID de la demande de crédit")
-    available_ids = load_available_client_ids() 
 
-    if not available_ids:
-        st.error("Impossible de charger la liste des IDs. L'application ne peut pas continuer. Vérifiez la configuration des données et les logs.")
-        st.stop() 
-
-    selected_client_id = int(st.sidebar.selectbox(
-        label="Choisissez un ID:",  
-        options=available_ids,            
-        index=0                           
-    ))
-
-
+    selected_client_id = st.session_state.selected_client_id
 
     if selected_client_id:
         st.header(f"Prédiction pour l'application ID : {selected_client_id}")
@@ -210,7 +206,7 @@ def show_home_dashboard():
                                 st.write(
                                     f"Le score du client est de **{raw_score_from_api:.2f}** pour cette application. "
                                     f"Ce score est **supérieur ou égal** au seuil de refus de {OPTIMAL_THRESHOLD_SCORE:.2f}. "
-                                    f"Cela correspond à une probabilité de défaut estimée à **{probabilite_de_remboursement/100:.2%}**. "
+                                    f"Cela correspond à une probabilité de défaut estimée à **{raw_score_from_api:.2f}**%. "
                                     "Sur la base de ces éléments, la demande de crédit est **refusée**."
                                 )
 
@@ -233,18 +229,7 @@ def show_informations_relatives_au_client():
     st.title("Informations relatives au client")
     st.markdown("---") 
 
-    st.sidebar.header("Sélection de l'ID de la demande de crédit")
-    available_ids = load_available_client_ids() 
-
-    if not available_ids:
-        st.error("Impossible de charger la liste des IDs. L'application ne peut pas continuer. Vérifiez la configuration des données et les logs.")
-        st.stop() 
-
-    selected_client_id = int(st.sidebar.selectbox(
-        label="Choisissez un ID:",  
-        options=available_ids,            
-        index=0                           
-    ))
+    selected_client_id = st.session_state.selected_client_id
 
     if selected_client_id:
         st.header(f"Analyse Détaillée du Client ID: {selected_client_id}")
@@ -282,30 +267,9 @@ def show_graphiques_informations_relatives_au_client():
     st.markdown("Comparez les informations du client sélectionné à celles d'autres groupes de clients.")
     st.markdown("---") 
 
-    # --- PARTIE 2 : Sélection du Client (avec Mémoire de Session) ---
-    st.sidebar.header("Sélection du Client")
-    available_ids = load_available_client_ids() 
-
-    if not available_ids:
-        st.error("Impossible de charger la liste des IDs.")
-        st.stop() 
-
-    # Utiliser st.session_state pour garder l'ID sélectionné en mémoire entre les pages
-    if 'selected_client_id' not in st.session_state: 
-        st.session_state.selected_client_id = available_ids[0]
-
-    # Callback pour mettre à jour l'état de la session lorsque qu'un nouvel id est sélectionné
-    def update_client_id_state():
-        st.session_state.selected_client_id = st.session_state.sidebar_client_id_for_graphs
-
-    selected_client_id = int(st.sidebar.selectbox(
-        label="Choisissez un ID:",  
-        options=available_ids,
-        key='sidebar_client_id_for_graphs', # Une clé unique pour ce widget
-        on_change=update_client_id_state, #Des qu'"un client est choisi fonction update_client_id_state appelée ce qui met notre id en mémoire dans la session state
-        # L'index est défini par l'ID actuellement en mémoire
-        index=available_ids.index(st.session_state.selected_client_id) #st.session_state.selected_client_id recupere l'id puis .index() recupere son index dans la liste puis index = valeur de la position dans la liste
-    ))
+    # --- PARTIE 2 : La sélection du client est faite par la sidebar centralisée
+   
+    selected_client_id = st.session_state.selected_client_id
 
     # --- Chargement des Données ---
     with st.spinner(f"Chargement des données pour le client {selected_client_id} et l'ensemble des applications"):
@@ -340,7 +304,7 @@ def show_graphiques_informations_relatives_au_client():
         )
     
     # --- PARTIE 5 : Logique de Filtrage du Groupe de Comparaison ---
-    client_series = client_main_info_df.iloc[0] #when you select a single row, Pandas "pivots" that row. The original column names become the new index of the Series. Si on vait mis [[0]] à la place on aurait eu un DataFrame
+    client_series = all_clients_df[all_clients_df['SK_ID_CURR'] == selected_client_id].iloc[0] #when you select a single row, Pandas "pivots" that row. The original column names become the new index of the Series. Si on vait mis [[0]] à la place on aurait eu un DataFrame
                                                 #its "easier" to use as a series because you can use it like a dictionnary with a key and a vlaue and not have to deal with the constraints of using a DatAFrame
     comparison_df = all_clients_df.copy() # Copie du DataFrame avec les colonnes de comparaison pour tout les clients de application_test
 
@@ -428,13 +392,29 @@ def show_graphiques_informations_relatives_au_client():
 
 def show_documentation_page():
     st.title("Documentation")
-    st.write("Cette page contiendra la documentation de l'application.")
+    st.write("Cette page contient les instructions pour utiliser l'application.")
     st.markdown("""
     ### Comment utiliser le tableau de bord (Home)
     1.  Allez sur la page **Home**.
     2.  Utilisez le menu déroulant dans la barre latérale gauche pour sélectionner un `ID` de client.
     3.  L'application contactera l'API pour récupérer le score de crédit.
     4.  Les résultats, y compris la probabilité de remboursement et la décision finale, seront affichés.
+                
+    ### Comment utiliser la page Informations client
+    1.  Allez sur la page **Informations client**.
+    2.  Utilisez le menu déroulant dans la barre latérale gauche pour sélectionner un `ID` de client.
+    3.  L'application contactera l'API pour récupérer le score de crédit.
+    4.  L'application contactera l'API pour récupérer le score de crédit qui pourra être consulté sur la page **Home**
+    5.  La page affichera ensuite les informations du clients.
+                
+    ### Comment utiliser la page Graphiques client
+    1.  Allez sur la page **Graphiques client**.
+    2.  Utilisez le menu déroulant dans la barre latérale gauche pour sélectionner un `ID` de client.
+    3.  L'application contactera l'API pour récupérer le score de crédit qui pourra être consulté sur la page **Home**           
+    4.  Utilisez le menu déroulant pour choisir une variable à comparer.
+    5.  Le graphique représentant la variable sélectionnée pour le client choisi sera affichée.
+    6.  Utilisez les boutons radio pour choisir à quel population de clients comparer le client.            
+    7.  Le graphique sera mis à jour si une population différente est sélectionnée.
     
     ### Signification des termes
     - **Score Client (risque)** : Un score calculé par le modèle. Plus le score est élevé, plus le risque de défaut de paiement est grand.
@@ -451,6 +431,61 @@ def show_about_page():
 
 # Define the navigation bar
 page = st_navbar(["Home", "Informations client", "Graphiques client", "Documentation", "About"])
+
+# Création d'une sidebar centralisée ici plutot que de l'avoir dans chaque fonction pour pas qu'elle ne soit récrée et reset l'id sélectionné a chaque changement de page
+
+st.sidebar.header("Sélection de l'ID de la demande de crédit")
+available_ids = load_available_client_ids()
+if not available_ids:
+    st.error("Impossible de charger les IDs. L'application ne peut pas continuer.")
+    st.stop()
+# 1. Initialize the session state key if it's not already present.
+#    This happens only on the very first run.
+if 'selected_client_id' not in st.session_state:
+    st.session_state.selected_client_id = available_ids[0]
+# 2. Find the index of the currently "remembered" client ID.
+#    This is crucial for telling the selectbox what to display.
+# 3. Define the callback function.
+#    This function will be called immediately when the selectbox value changes. Nous permet de pas avoir a selectionner l'id deux fois a chaque fois
+def update_client_id():
+    """
+    Copies the value from the widget's temporary state
+    to our application's master state.
+    """
+    st.session_state.selected_client_id = st.session_state.sidebar_selector
+
+# How the callback works :
+
+# User selects a new ID.
+# st.session_state.sidebar_selector is updated. This is an internal Streamlit mechanism. Because the widget has a key, its value is automatically reflected in st.session_state.
+# The on_change callback is executed. the update_client_id function runs before the main script rerun. This is the crucial part. It's during this callback that the line st.session_state.selected_client_id = st.session_state.sidebar_selector is executed.
+# And then the full script rerun is triggered.
+# Otherwise there's an issue everytime everytime we try to select an id we have to do it a second time 
+
+# This is what happens without the callback : If we had 100002 selected and we select a new ID (100003).
+# This triggers a script rerun.
+# During the rerun, the selectbox code is executed. It is created using index=current_index. At this exact moment, current_index is still based on the old session state (100002).
+# The assignment st.session_state.selected_client_id = ... happens, and the state is updated to 100003.
+# However, for that same rerun, the selectbox widget has already been sent to the browser with instructions to display the old value.
+# The rest of your script (the if page == "Home" part) correctly uses the new ID 100003, so the page content updates. But the selectbox itself visually lags behind.
+# Now, on your second click, the session state is already correct (100003), so current_index is calculated correctly, and everything syncs up.
+
+
+
+try:
+    current_index = available_ids.index(st.session_state.selected_client_id) #récupere la position/index de l'id de la session state premiere position si premiere initialisation
+except ValueError:
+    current_index = 0  # Fallback in case the saved ID is invalid
+# 4. Create the ONE and ONLY selectbox for the entire application.
+#    When the user chooses a new value, we immediately assign it
+#    back to our session state key, updating the "memory".
+st.session_state.selected_client_id = st.sidebar.selectbox( #Ici on définit l'id
+    label="Choisissez un ID:",
+    options=available_ids,
+    index=current_index,
+    key='sidebar_selector',  # This gives the widget its own temporary key in session_state.
+    on_change=update_client_id # This tells Streamlit to run our function when a change is made.  
+)
 
 # Page selection
 if page == "Home":

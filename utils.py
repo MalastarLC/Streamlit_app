@@ -435,15 +435,19 @@ def create_gauge_chart(score, threshold):
 # Dictionnaire associant des noms lisibles aux noms de colonnes techniques.
 COMPARISON_COLS = {
     # Variables Numériques
+    'Score externe 1': 'EXT_SOURCE_1',
+    'Score externe 2': 'EXT_SOURCE_2',
+    'Score externe 3': 'EXT_SOURCE_3',
+    # 'Proportion remboursée sur autres prêts': 'PROPORTION_REPAID', Elle ne fait pas partie de applciation_test --> potentiel axe d'amélioration
+    'Mensualité du prêt': 'AMT_ANNUITY',
     'Revenu Total': 'AMT_INCOME_TOTAL',
     'Montant du Crédit': 'AMT_CREDIT',
     'Prix du Bien': 'AMT_GOODS_PRICE',
-    'Âge du client (années)': 'AGE_ANNÉES',
+    'Âge du client': 'AGE_ANNÉES',
     'Années d\'emploi': 'ANNÉES_EMPLOI',
     'Nombre d\'enfants': 'CNT_CHILDREN',
+    
     # Variables Catégorielles
-
-    'Genre': 'CODE_GENDER',
     'Type de prêt' : 'NAME_CONTRACT_TYPE',
     'Niveau d\'éducation': 'NAME_EDUCATION_TYPE',
     'Statut Familial': 'NAME_FAMILY_STATUS',
