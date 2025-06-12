@@ -359,6 +359,19 @@ def show_graphiques_informations_relatives_au_client():
         st.plotly_chart(fig, use_container_width=True)
         if pd.isna(client_value):
             st.warning(f"La valeur pour '{selected_variable_label}' n'est pas disponible pour ce client.")
+        if pd.notna(client_value):
+            # Format the value for better readability.
+            # Use f-string formatting to handle decimals for floats and no decimals for integers.
+            if isinstance(client_value, float):
+                formatted_value = f"{client_value:,.2f}" # e.g., 150,000.00
+            else:
+                formatted_value = f"{client_value:,}" # e.g., 150,000
+
+            # Use st.markdown for rich text formatting
+            st.markdown(
+                f"La valeur du client **{selected_client_id}** pour la variable **'{selected_variable_label}'** est de **<span style='color:red; font-weight:bold;'>{formatted_value}</span>**.",
+                unsafe_allow_html=True
+            )
 
     else:
         # --- Graphique pour Variable CATÉGORIELLE (Diagramme en barres) ---
@@ -424,8 +437,11 @@ def show_documentation_page():
 
 def show_about_page():
     st.title("À Propos de l'outil")
-    st.write("Ce dashboard.")
-    st.write("placeholder")
+    st.write("Le script utilisé pour créer ce dashboard ainsi que les fonctions utilisées sont accessibles dans le repository suivant :")
+    st.write("*https://github.com/MalastarLC/Streamlit_app*")
+    st.markdown("---")
+    st.write("Le modèle utilisé ainsi que les fichiers nécessaires pour deployer l'API sont accessibles dans le repository suivant :")
+    st.write("*https://github.com/MalastarLC/Home_Credit_Project_Ver2*")
 
 # --- 4. MAIN APP LOGIC WITH NAVIGATION ---
 
