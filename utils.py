@@ -4,7 +4,7 @@ import streamlit as st # Still needed for @st.cache_data and st.error
 import pandas as pd
 import numpy as np
 import requests
-# import os Plus besoin car on va lire depuis le service S3 de AWS
+import os #Plus besoin car on va lire depuis le service S3 de AWS #si enfait
 import plotly.graph_objects as go
 # import json # Not directly used by these functions but by app.py for payload size
 
@@ -143,7 +143,7 @@ def load_available_client_ids(app_file_name: str = "application_test.csv") -> li
     """
     # (Function code remains the same, but ensure DATA_PATH is accessible)
     try:
-        file_path = os.path.join(DATA_PATH, app_file_name) # Uses DATA_PATH from this file
+        file_path = os.path.join("s3://p8-credit-scoring-dashboard-data-2025/data/", app_file_name) # Uses DATA_PATH from this file
         # ... rest of the function
         df = pd.read_csv(file_path, usecols=['SK_ID_CURR'])
         client_ids = sorted(df['SK_ID_CURR'].unique().tolist())
@@ -500,7 +500,7 @@ def load_all_clients_data(app_file_name: str = "application_test.csv"):
         # S'assurer qu'il n'y a pas de doublons
         cols_to_load = list(set(cols_to_load))
 
-        file_path = os.path.join(DATA_PATH, app_file_name)
+        file_path = os.path.join("s3://p8-credit-scoring-dashboard-data-2025/data/", app_file_name)
         df_all = pd.read_csv(file_path, usecols=cols_to_load)
 
         # --- Création de features simples pour la comparaison ---
