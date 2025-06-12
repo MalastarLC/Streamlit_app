@@ -18,7 +18,7 @@ from utils import load_available_client_ids, get_data_for_client, call_predictio
 # Le script utilise ensuite cette nouvelle valeur pour afficher les bonnes informations.
 # Pendant ce temps, les fonctions marquées avec @st.cache_data ne sont pas ré-exécutées si leurs arguments n'ont pas changé, ce qui permet de garder l'application rapide.
 
-
+#test commit
 
 API_URL = "https://credit-scoring-api-p5ym.onrender.com/predict"
 DATA_PATH = "data/"
