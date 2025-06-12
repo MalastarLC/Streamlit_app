@@ -4,5 +4,5 @@ pandas
 numpy
 requests
 boto3
-s3fs
+s3fs == 2025.5.1
 plotly
