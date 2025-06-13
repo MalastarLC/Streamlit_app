@@ -21,7 +21,7 @@ import plotly.graph_objects as go
 
 # DATA_PATH = "data/" Plus besoin car on va lire depuis le service S3 de AWS 
 
-S3_BUCKET_NAME = "p8-credit-scoring-dashboard-data-2025" # Nom du bucket S3
+S3_BUCKET_NAME = "p8-credit-dashboard-data-paris" # Nom du bucket S3
 
 # API_URL is used by call_prediction_api - better to pass it as an argument from app.py
 
@@ -121,7 +121,7 @@ CREDIT_CARD_BALANCE_COLS_NEEDED = [
 
 # --- HELPER FUNCTION DEFINITIONS ---
 
-# @st.cache_data commenté pour le debuggage
+# @st.cache_data
 def load_available_client_ids(app_file_name: str = "application_test.csv") -> list:
     """
     Loads unique SK_ID_CURR values from the specified application CSV file.
@@ -198,7 +198,7 @@ def prepare_df_for_json(df_orig: pd.DataFrame) -> list:
         df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], np.nan)
     return df.astype(object).where(pd.notnull(df), None).to_dict(orient='records')
 
-# @st.cache_data commenté pour le debugging
+# @st.cache_data
 def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | None]:
     """
     Loads, filters, and prepares data from all 7 source CSV files for a single selected client.
@@ -234,7 +234,7 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
     data_frames_for_payload_preparation = {} # Use a temporary dict to store raw filtered DFs
     client_main_descriptive_df = pd.DataFrame() # This will be current_app
 
-    S3_BUCKET_NAME = "p8-credit-scoring-dashboard-data-2025"
+    S3_BUCKET_NAME = "p8-credit-dashboard-data-paris"
     S3_DATA_FOLDER = f"s3://{S3_BUCKET_NAME}/data" # Définir le dossier de base
 
     try:
@@ -497,7 +497,7 @@ COMPARISON_COLS = {
     'Possède une voiture': 'FLAG_OWN_CAR'
 }
 
-@st.cache_data
+# @st.cache_data
 def load_all_clients_data(app_file_name: str = "application_test.csv"):
     """
     Charge les données descriptives pour tous les clients depuis application_test.csv.

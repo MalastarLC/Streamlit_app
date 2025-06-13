@@ -133,9 +133,6 @@ def show_home_dashboard(selected_client_id):
     st.title('Prêt à dépenser : Outil de "scoring crédit"')
     st.markdown("---") 
 
-
-    selected_client_id = st.session_state.selected_client_id
-
     if selected_client_id:
         st.header(f"Prédiction pour l'application ID : {selected_client_id}")
         #st.header(f"🔍 Analyse Détaillée du Client ID: {selected_client_id}")
@@ -229,8 +226,6 @@ def show_informations_relatives_au_client(selected_client_id):
     st.title("Informations relatives au client")
     st.markdown("---") 
 
-    selected_client_id = st.session_state.selected_client_id
-
     if selected_client_id:
         st.header(f"Analyse Détaillée du Client ID: {selected_client_id}")
         #st.header(f"🔍 Analyse Détaillée du Client ID: {selected_client_id}")
@@ -268,8 +263,6 @@ def show_graphiques_informations_relatives_au_client(selected_client_id):
     st.markdown("---") 
 
     # --- PARTIE 2 : La sélection du client est faite par la sidebar centralisée
-   
-    selected_client_id = st.session_state.selected_client_id
 
     # --- Chargement des Données ---
     with st.spinner(f"Chargement des données pour le client {selected_client_id} et l'ensemble des applications"):
