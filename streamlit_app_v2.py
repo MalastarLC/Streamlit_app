@@ -125,7 +125,7 @@ st.set_page_config(layout="wide",
 
 # --- 3. HOME PAGE APPLICATION LAYOUT AND LOGIC ---
 
-def show_home_dashboard():
+def show_home_dashboard(selected_client_id):
     """
     This function contains all the logic the home dashboard page.
     """
@@ -224,7 +224,7 @@ def show_home_dashboard():
             else: 
                 st.warning("Aucune réponse (ou une erreur) n'a été reçue de l'API pour le calcul du score. Vérifiez les messages d'erreur précédents et l'état de l'API.")
 
-def show_informations_relatives_au_client():
+def show_informations_relatives_au_client(selected_client_id):
 
     st.title("Informations relatives au client")
     st.markdown("---") 
@@ -259,7 +259,7 @@ def show_informations_relatives_au_client():
         st.write("Aucune information descriptive principale trouvée pour ce client dans application_test.csv.")
     st.markdown("---")
 
-def show_graphiques_informations_relatives_au_client():
+def show_graphiques_informations_relatives_au_client(selected_client_id):
 
 
     # --- PARTIE 1 : Initialisation de la Page ---
@@ -403,7 +403,7 @@ def show_graphiques_informations_relatives_au_client():
 
  
 
-def show_documentation_page():
+def show_documentation_page(selected_client_id):
     st.title("Documentation")
     st.write("Cette page contient les instructions pour utiliser l'application.")
     st.markdown("""
@@ -435,7 +435,7 @@ def show_documentation_page():
     - **Probabilité de Remboursement** : L'estimation de la chance que le client rembourse son prêt. C'est l'inverse du score de risque.
     """)
 
-def show_about_page():
+def show_about_page(selected_client_id):
     st.title("À Propos de l'outil")
     st.write("Le script utilisé pour créer ce dashboard ainsi que les fonctions utilisées sont accessibles dans le repository suivant :")
     st.write("*https://github.com/MalastarLC/Streamlit_app*")
@@ -495,22 +495,22 @@ except ValueError:
 # 4. Create the ONE and ONLY selectbox for the entire application.
 #    When the user chooses a new value, we immediately assign it
 #    back to our session state key, updating the "memory".
-st.session_state.selected_client_id = st.sidebar.selectbox( #Ici on définit l'id
+st.sidebar.selectbox(
     label="Choisissez un ID:",
     options=available_ids,
     index=current_index,
-    key='sidebar_selector',  # This gives the widget its own temporary key in session_state.
-    on_change=update_client_id # This tells Streamlit to run our function when a change is made.  
+    key='sidebar_selector',
+    on_change=update_client_id 
 )
 
 # Page selection
 if page == "Home":
-    show_home_dashboard()
+    show_home_dashboard(st.session_state.selected_client_id)
 elif page == "Graphiques client":
-    show_graphiques_informations_relatives_au_client()
+    show_graphiques_informations_relatives_au_client(st.session_state.selected_client_id)
 elif page == "Informations client":
-    show_informations_relatives_au_client()
+    show_informations_relatives_au_client(st.session_state.selected_client_id)
 elif page == "Documentation":
-    show_documentation_page()
+    show_documentation_page(st.session_state.selected_client_id)
 elif page == "About":
-    show_about_page()
+    show_about_page(st.session_state.selected_client_id)

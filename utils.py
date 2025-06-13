@@ -121,7 +121,7 @@ CREDIT_CARD_BALANCE_COLS_NEEDED = [
 
 # --- HELPER FUNCTION DEFINITIONS ---
 
-@st.cache_data 
+# @st.cache_data commenté pour le debuggage
 def load_available_client_ids(app_file_name: str = "application_test.csv") -> list:
     """
     Loads unique SK_ID_CURR values from the specified application CSV file.
@@ -143,19 +143,19 @@ def load_available_client_ids(app_file_name: str = "application_test.csv") -> li
     """
     # (Function code remains the same, but ensure DATA_PATH is accessible)
     try:
-        file_path = os.path.join("s3://p8-credit-scoring-dashboard-data-2025/data/", app_file_name) # Uses DATA_PATH from this file
+        s3_path = f"s3://p8-credit-scoring-dashboard-data-2025/data/{app_file_name}"
         # ... rest of the function
-        df = pd.read_csv(file_path, usecols=['SK_ID_CURR'])
+        df = pd.read_csv(s3_path, usecols=['SK_ID_CURR'])
         client_ids = sorted(df['SK_ID_CURR'].unique().tolist())
         if not client_ids: 
-            st.error(f"No client IDs found in '{file_path}'.") # st.error still works
+            st.error(f"No client IDs found in '{s3_path}'.") # st.error still works
             return [] 
         return client_ids
     except FileNotFoundError:
-        st.error(f"Data file '{file_path}' not found.")
+        st.error(f"Data file '{s3_path}' not found.")
         return []
     except ValueError as ve: 
-        st.error(f"Error reading '{file_path}': {ve}")
+        st.error(f"Error reading '{s3_path}': {ve}")
         return []
     except Exception as e: 
         st.error(f"Unexpected error loading client IDs: {e}")
@@ -198,7 +198,7 @@ def prepare_df_for_json(df_orig: pd.DataFrame) -> list:
         df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], np.nan)
     return df.astype(object).where(pd.notnull(df), None).to_dict(orient='records')
 
-@st.cache_data 
+# @st.cache_data commenté pour le debugging
 def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | None]:
     """
     Loads, filters, and prepares data from all 7 source CSV files for a single selected client.
@@ -234,8 +234,14 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
     data_frames_for_payload_preparation = {} # Use a temporary dict to store raw filtered DFs
     client_main_descriptive_df = pd.DataFrame() # This will be current_app
 
+    S3_BUCKET_NAME = "p8-credit-scoring-dashboard-data-2025"
+    S3_DATA_FOLDER = f"s3://{S3_BUCKET_NAME}/data" # Définir le dossier de base
+
     try:
         # --- 1. current_app (from application_test.csv) ---
+
+        print("--- DÉBUT: get_data_for_client ---")
+        print(f"Bucket S3 utilisé : {S3_BUCKET_NAME}")
 
         list_of_paths = [
                         's3://p8-credit-scoring-dashboard-data-2025/data/application_test.csv',
@@ -247,24 +253,31 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
                         's3://p8-credit-scoring-dashboard-data-2025/data/credit_card_balance.csv'
                         ]
 
-
+        print("Lecture de application_test.csv depuis S3...")
 
         df_app_test_full = pd.read_csv(
             #os.path.join(DATA_PATH, "application_test.csv"), 
-            list_of_paths[0],
+            f"{S3_DATA_FOLDER}/application_test.csv",
             usecols=APPLICATION_TEST_COLS_NEEDED
         )
+
+        print("SUCCÈS : application_test.csv lu.")
+
         client_main_descriptive_df = df_app_test_full[df_app_test_full['SK_ID_CURR'] == client_id]
         if client_main_descriptive_df.empty:
             st.error(f"Client ID {client_id} not found in application_test.csv (or required columns are missing for this ID).")
             return None, None 
+                
+        print("SUCCÈS : Client trouvé dans application_test.csv.")
+
         data_frames_for_payload_preparation["current_app"] = client_main_descriptive_df # Store the raw DF
 
         # --- 2. bureau.csv ---
         df_bureau_full = pd.read_csv(
-            list_of_paths[1],
+            f"{S3_DATA_FOLDER}/bureau.csv",
             usecols=BUREAU_COLS_NEEDED
         )
+        print("SUCCÈS : bureau.csv lu.")
         client_bureau_df = df_bureau_full[df_bureau_full['SK_ID_CURR'] == client_id]
         data_frames_for_payload_preparation["bureau"] = client_bureau_df # Store the raw DF
         
@@ -275,9 +288,10 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
         # --- 3. bureau_balance.csv ---
         if client_sk_id_bureau_list: 
             df_bureau_balance_full = pd.read_csv(
-                list_of_paths[2], 
+                f"{S3_DATA_FOLDER}/bureau_balance.csv", 
                 usecols=BUREAU_BALANCE_COLS_NEEDED
             )
+            print("SUCCÈS : bureau_balance.csv lu.")
             client_bureau_balance_df = df_bureau_balance_full[
                 df_bureau_balance_full['SK_ID_BUREAU'].isin(client_sk_id_bureau_list)
             ]
@@ -287,9 +301,10 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
 
         # --- 4. previous_application.csv ---
         df_prev_app_full = pd.read_csv(
-            list_of_paths[3], 
+            f"{S3_DATA_FOLDER}/previous_application.csv", 
             usecols=PREVIOUS_APPLICATION_COLS_NEEDED
         )
+        print("SUCCÈS : previous_application.csv lu.")
         client_prev_app_df = df_prev_app_full[df_prev_app_full['SK_ID_CURR'] == client_id]
         data_frames_for_payload_preparation["previous_application"] = client_prev_app_df # Store
         
@@ -299,9 +314,10 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
 
         # --- 5. POS_CASH_balance.csv ---
         df_pos_cash_full = pd.read_csv(
-            list_of_paths[4], 
+            f"{S3_DATA_FOLDER}/POS_CASH_balance.csv", 
             usecols=POS_CASH_BALANCE_COLS_NEEDED
         )
+        print("SUCCÈS : POS_CASH_balance.csv lu.")
         filter_pos_by_curr = df_pos_cash_full['SK_ID_CURR'] == client_id
         filter_pos_by_prev = pd.Series([False] * len(df_pos_cash_full)) 
         if client_sk_id_prev_list and 'SK_ID_PREV' in df_pos_cash_full.columns:
@@ -311,9 +327,10 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
         
         # --- 6. installments_payments.csv ---
         df_installments_full = pd.read_csv(
-            list_of_paths[5], 
+            f"{S3_DATA_FOLDER}/installments_payments.csv",
             usecols=INSTALLMENTS_PAYMENTS_COLS_NEEDED
         )
+        print("SUCCÈS : installments_payments.csv lu.")
         filter_install_by_curr = df_installments_full['SK_ID_CURR'] == client_id
         filter_install_by_prev = pd.Series([False] * len(df_installments_full))
         if client_sk_id_prev_list and 'SK_ID_PREV' in df_installments_full.columns:
@@ -323,9 +340,10 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
 
         # --- 7. credit_card_balance.csv ---
         df_credit_card_full = pd.read_csv(
-            list_of_paths[6], 
+            f"{S3_DATA_FOLDER}/credit_card_balance.csv",
             usecols=CREDIT_CARD_BALANCE_COLS_NEEDED
         )
+        print("SUCCÈS : credit_card_balance.csv lu.")
         filter_cc_by_curr = df_credit_card_full['SK_ID_CURR'] == client_id
         filter_cc_by_prev = pd.Series([False] * len(df_credit_card_full))
         if client_sk_id_prev_list and 'SK_ID_PREV' in df_credit_card_full.columns:
@@ -342,7 +360,11 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
         
         # client_main_descriptive_df is essentially the current_app slice before JSON prep
         # which is data_frames_for_payload_preparation["current_app"]
+
+        print("--- FIN: get_data_for_client ---")
+
         return api_payload, data_frames_for_payload_preparation["current_app"]
+    
 
     except FileNotFoundError as e:
         st.error(f"Data file not found (utils.py): {e}.")
@@ -491,7 +513,7 @@ def load_all_clients_data(app_file_name: str = "application_test.csv"):
     """
 
     # Pas d'aggrégation ducoup NaNs ne devraient pas causer d'erreurs et Plotly ignorera juste les NaNs dans les graphiques
-
+    
     try:
         # On ne charge que les colonnes nécessaires, y compris celles pour les calculs.
         cols_to_load = list(set(COMPARISON_COLS.values()) - {'AGE_ANNÉES', 'ANNÉES_EMPLOI'})
@@ -500,8 +522,8 @@ def load_all_clients_data(app_file_name: str = "application_test.csv"):
         # S'assurer qu'il n'y a pas de doublons
         cols_to_load = list(set(cols_to_load))
 
-        file_path = os.path.join("s3://p8-credit-scoring-dashboard-data-2025/data/", app_file_name)
-        df_all = pd.read_csv(file_path, usecols=cols_to_load)
+        s3_path = f"s3://p8-credit-scoring-dashboard-data-2025/data/{app_file_name}"
+        df_all = pd.read_csv(s3_path, usecols=cols_to_load)
 
         # --- Création de features simples pour la comparaison ---
         # Calcul de l'âge
@@ -519,7 +541,7 @@ def load_all_clients_data(app_file_name: str = "application_test.csv"):
         return df_all
 
     except FileNotFoundError:
-        st.error(f"Le fichier de données '{file_path}' n'a pas été trouvé pour les graphiques de comparaison.")
+        st.error(f"Le fichier de données '{s3_path}' n'a pas été trouvé pour les graphiques de comparaison.")
         return pd.DataFrame()
     except Exception as e:
         st.error(f"Une erreur est survenue lors du chargement des données de tous les clients : {e}")
