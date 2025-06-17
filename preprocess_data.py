@@ -81,13 +81,15 @@ PARTITION_KEYS = {
 def create_parquet_files():
     """
     Reads large CSVs in chunks and writes them to partitioned Parquet format,
-    providing progress updates along the way.
+    providing progress updates and handling high partition counts.
     """
     if not os.path.exists(OUTPUT_PARQUET_DIR):
         os.makedirs(OUTPUT_PARQUET_DIR)
         print(f"Created output directory: {OUTPUT_PARQUET_DIR}")
 
-    chunk_size = 500000  # Process 500,000 rows at a time
+    chunk_size = 500000
+    # A generous limit high enough for our largest file (~31k partitions)
+    partition_limit = 40000 
 
     for filename, cols_to_read in REQUIRED_COLUMNS.items():
         try:
@@ -98,29 +100,27 @@ def create_parquet_files():
             print(f"\n--- Processing {filename} ---")
 
             if partition_key:
-                # --- THIS IS THE KEY CHANGE: PROCESS IN CHUNKS ---
                 print(f"Reading {filename} in chunks of {chunk_size} rows...")
                 
-                # Create a reader that yields chunks
                 csv_reader = pd.read_csv(source_path, usecols=cols_to_read, chunksize=chunk_size, low_memory=False)
                 
                 for i, chunk_df in enumerate(csv_reader):
                     print(f"  -> Processing chunk {i+1}...")
                     
-                    # Convert this smaller chunk to a PyArrow Table
                     table = pa.Table.from_pandas(chunk_df, preserve_index=False)
                     
-                    # Write this chunk to the dataset. PyArrow handles appending to the correct partitions.
+                    # --- THIS IS THE KEY COMBINED SOLUTION ---
                     pq.write_to_dataset(
                         table,
                         root_path=output_path,
-                        partition_cols=[partition_key]
-                        # No need for max_partitions when writing chunk by chunk
+                        partition_cols=[partition_key],
+                        max_partitions=partition_limit, # Add the limit override back in
+                        use_legacy_dataset=False # Use the modern, more robust dataset writer
                     )
+                    # --- END OF SOLUTION ---
+
                 print(f"Finished processing all chunks for {filename}.")
-                # --- END OF CHANGE ---
             else:
-                # For small, non-partitioned files, process them at once.
                 print(f"Reading full file for {filename}...")
                 df = pd.read_csv(source_path, usecols=cols_to_read)
                 df.to_parquet(output_path, engine='pyarrow', index=False)
@@ -131,6 +131,6 @@ def create_parquet_files():
             traceback.print_exc()
 
 if __name__ == '__main__':
-    print("--- Starting Data Pre-processing to Parquet (Chunked Version) ---")
+    print("--- Starting Data Pre-processing to Parquet (Final Chunked Version) ---")
     create_parquet_files()
     print("\n--- Pre-processing Complete ---")
