@@ -49,62 +49,25 @@ When pandas reads the Parquet file for client 100003, it says:
 import pandas as pd
 import os
 import traceback
-import pyarrow.parquet as pq # Import the pyarrow parquet module directly
-import pyarrow as pa # Import the base pyarrow module
+import pyarrow.parquet as pq
+import pyarrow as pa
 
-# This script converts the original large CSVs into an efficient, partitioned Parquet format.
-# This only needs to be run ONCE on your local machine.
+# This is the definitive pre-processing script.
 
 # --- Configuration ---
 SOURCE_DATA_DIR = 'data'
 OUTPUT_PARQUET_DIR = 'data_parquet'
 
-# --- Define the exact columns needed for each file, based on preprocessing_pipeline.py ---
-# (This section remains unchanged)
+# --- Column and Partition Key definitions (Unchanged) ---
 REQUIRED_COLUMNS = {
     'application_test.csv': None,
-    'bureau.csv': [
-       'SK_ID_CURR', 'SK_ID_BUREAU', 'CREDIT_ACTIVE', 'CREDIT_CURRENCY', 'DAYS_CREDIT', 
-       'CREDIT_DAY_OVERDUE', 'DAYS_CREDIT_ENDDATE', 'DAYS_ENDDATE_FACT', 'AMT_CREDIT_MAX_OVERDUE', 
-       'CNT_CREDIT_PROLONG', 'AMT_CREDIT_SUM', 'AMT_CREDIT_SUM_DEBT', 'AMT_CREDIT_SUM_LIMIT', 
-       'AMT_CREDIT_SUM_OVERDUE', 'CREDIT_TYPE', 'DAYS_CREDIT_UPDATE', 'AMT_ANNUITY'
-    ],
-    'bureau_balance.csv': [
-        'SK_ID_BUREAU', 'MONTHS_BALANCE', 'STATUS'
-    ],
-    'POS_CASH_balance.csv': [
-       'SK_ID_PREV', 'SK_ID_CURR', 'MONTHS_BALANCE', 'CNT_INSTALMENT', 'CNT_INSTALMENT_FUTURE', 
-       'NAME_CONTRACT_STATUS', 'SK_DPD', 'SK_DPD_DEF'
-    ],
-    'installments_payments.csv': [
-       'SK_ID_PREV', 'SK_ID_CURR', 'NUM_INSTALMENT_VERSION', 'NUM_INSTALMENT_NUMBER', 
-       'DAYS_INSTALMENT', 'DAYS_ENTRY_PAYMENT', 'AMT_INSTALMENT', 'AMT_PAYMENT'
-    ],
-    'previous_application.csv': [
-       'SK_ID_PREV', 'SK_ID_CURR', 'NAME_CONTRACT_TYPE', 'AMT_ANNUITY', 'AMT_APPLICATION', 
-       'AMT_CREDIT', 'AMT_DOWN_PAYMENT', 'AMT_GOODS_PRICE', 'WEEKDAY_APPR_PROCESS_START', 
-       'HOUR_APPR_PROCESS_START', 'FLAG_LAST_APPL_PER_CONTRACT', 'NFLAG_LAST_APPL_IN_DAY', 
-       'RATE_DOWN_PAYMENT', 'RATE_INTEREST_PRIMARY', 'RATE_INTEREST_PRIVILEGED', 
-       'NAME_CASH_LOAN_PURPOSE', 'NAME_CONTRACT_STATUS', 'DAYS_DECISION', 'NAME_PAYMENT_TYPE', 
-       'CODE_REJECT_REASON', 'NAME_TYPE_SUITE', 'NAME_CLIENT_TYPE', 'NAME_GOODS_CATEGORY', 
-       'NAME_PORTFOLIO', 'NAME_PRODUCT_TYPE', 'CHANNEL_TYPE', 'SELLERPLACE_AREA', 
-       'NAME_SELLER_INDUSTRY', 'CNT_PAYMENT', 'NAME_YIELD_GROUP', 'PRODUCT_COMBINATION', 
-       'DAYS_FIRST_DRAWING', 'DAYS_FIRST_DUE', 'DAYS_LAST_DUE_1ST_VERSION', 'DAYS_LAST_DUE', 
-       'DAYS_TERMINATION', 'NFLAG_INSURED_ON_APPROVAL'
-    ],
-    'credit_card_balance.csv': [
-       'SK_ID_PREV', 'SK_ID_CURR', 'MONTHS_BALANCE', 'AMT_BALANCE', 'AMT_CREDIT_LIMIT_ACTUAL', 
-       'AMT_DRAWINGS_ATM_CURRENT', 'AMT_DRAWINGS_CURRENT', 'AMT_DRAWINGS_OTHER_CURRENT', 
-       'AMT_DRAWINGS_POS_CURRENT', 'AMT_INST_MIN_REGULARITY', 'AMT_PAYMENT_CURRENT', 
-       'AMT_PAYMENT_TOTAL_CURRENT', 'AMT_RECEIVABLE_PRINCIPAL', 'AMT_RECIVABLE', 
-       'AMT_TOTAL_RECEIVABLE', 'CNT_DRAWINGS_ATM_CURRENT', 'CNT_DRAWINGS_CURRENT', 
-       'CNT_DRAWINGS_OTHER_CURRENT', 'CNT_DRAWINGS_POS_CURRENT', 'CNT_INSTALMENT_MATURE_CUM', 
-       'NAME_CONTRACT_STATUS', 'SK_DPD', 'SK_DPD_DEF'
-    ]
+    'bureau.csv': ['SK_ID_CURR', 'SK_ID_BUREAU', 'CREDIT_ACTIVE', 'CREDIT_CURRENCY', 'DAYS_CREDIT', 'CREDIT_DAY_OVERDUE', 'DAYS_CREDIT_ENDDATE', 'DAYS_ENDDATE_FACT', 'AMT_CREDIT_MAX_OVERDUE', 'CNT_CREDIT_PROLONG', 'AMT_CREDIT_SUM', 'AMT_CREDIT_SUM_DEBT', 'AMT_CREDIT_SUM_LIMIT', 'AMT_CREDIT_SUM_OVERDUE', 'CREDIT_TYPE', 'DAYS_CREDIT_UPDATE', 'AMT_ANNUITY'],
+    'bureau_balance.csv': ['SK_ID_BUREAU', 'MONTHS_BALANCE', 'STATUS'],
+    'POS_CASH_balance.csv': ['SK_ID_PREV', 'SK_ID_CURR', 'MONTHS_BALANCE', 'CNT_INSTALMENT', 'CNT_INSTALMENT_FUTURE', 'NAME_CONTRACT_STATUS', 'SK_DPD', 'SK_DPD_DEF'],
+    'installments_payments.csv': ['SK_ID_PREV', 'SK_ID_CURR', 'NUM_INSTALMENT_VERSION', 'NUM_INSTALMENT_NUMBER', 'DAYS_INSTALMENT', 'DAYS_ENTRY_PAYMENT', 'AMT_INSTALMENT', 'AMT_PAYMENT'],
+    'previous_application.csv': ['SK_ID_PREV', 'SK_ID_CURR', 'NAME_CONTRACT_TYPE', 'AMT_ANNUITY', 'AMT_APPLICATION', 'AMT_CREDIT', 'AMT_DOWN_PAYMENT', 'AMT_GOODS_PRICE', 'WEEKDAY_APPR_PROCESS_START', 'HOUR_APPR_PROCESS_START', 'FLAG_LAST_APPL_PER_CONTRACT', 'NFLAG_LAST_APPL_IN_DAY', 'RATE_DOWN_PAYMENT', 'RATE_INTEREST_PRIMARY', 'RATE_INTEREST_PRIVILEGED', 'NAME_CASH_LOAN_PURPOSE', 'NAME_CONTRACT_STATUS', 'DAYS_DECISION', 'NAME_PAYMENT_TYPE', 'CODE_REJECT_REASON', 'NAME_TYPE_SUITE', 'NAME_CLIENT_TYPE', 'NAME_GOODS_CATEGORY', 'NAME_PORTFOLIO', 'NAME_PRODUCT_TYPE', 'CHANNEL_TYPE', 'SELLERPLACE_AREA', 'NAME_SELLER_INDUSTRY', 'CNT_PAYMENT', 'NAME_YIELD_GROUP', 'PRODUCT_COMBINATION', 'DAYS_FIRST_DRAWING', 'DAYS_FIRST_DUE', 'DAYS_LAST_DUE_1ST_VERSION', 'DAYS_LAST_DUE', 'DAYS_TERMINATION', 'NFLAG_INSURED_ON_APPROVAL'],
+    'credit_card_balance.csv': ['SK_ID_PREV', 'SK_ID_CURR', 'MONTHS_BALANCE', 'AMT_BALANCE', 'AMT_CREDIT_LIMIT_ACTUAL', 'AMT_DRAWINGS_ATM_CURRENT', 'AMT_DRAWINGS_CURRENT', 'AMT_DRAWINGS_OTHER_CURRENT', 'AMT_DRAWINGS_POS_CURRENT', 'AMT_INST_MIN_REGULARITY', 'AMT_PAYMENT_CURRENT', 'AMT_PAYMENT_TOTAL_CURRENT', 'AMT_RECEIVABLE_PRINCIPAL', 'AMT_RECIVABLE', 'AMT_TOTAL_RECEIVABLE', 'CNT_DRAWINGS_ATM_CURRENT', 'CNT_DRAWINGS_CURRENT', 'CNT_DRAWINGS_OTHER_CURRENT', 'CNT_DRAWINGS_POS_CURRENT', 'CNT_INSTALMENT_MATURE_CUM', 'NAME_CONTRACT_STATUS', 'SK_DPD', 'SK_DPD_DEF']
 }
-
-# --- Define the correct partition key for each file based on the data schema ---
-# (This section remains unchanged)
 PARTITION_KEYS = {
     'application_test.csv': None,
     'bureau.csv': 'SK_ID_CURR',
@@ -115,58 +78,59 @@ PARTITION_KEYS = {
     'credit_card_balance.csv': 'SK_ID_CURR'
 }
 
-
 def create_parquet_files():
     """
-    Reads the original CSVs, selects only the necessary columns, and saves them
-    as efficient, partitioned Parquet files.
+    Reads large CSVs in chunks and writes them to partitioned Parquet format,
+    providing progress updates along the way.
     """
     if not os.path.exists(OUTPUT_PARQUET_DIR):
         os.makedirs(OUTPUT_PARQUET_DIR)
         print(f"Created output directory: {OUTPUT_PARQUET_DIR}")
 
-    partition_limit = 40000 
+    chunk_size = 500000  # Process 500,000 rows at a time
 
     for filename, cols_to_read in REQUIRED_COLUMNS.items():
         try:
             source_path = os.path.join(SOURCE_DATA_DIR, filename)
             partition_key = PARTITION_KEYS.get(filename)
+            output_path = os.path.join(OUTPUT_PARQUET_DIR, filename.replace('.csv', '.parquet'))
             
-            print(f"Processing {filename}...")
-
-            df = pd.read_csv(source_path, usecols=cols_to_read, low_memory=False)
-            
-            # Convert pandas DataFrame to a PyArrow Table
-            table = pa.Table.from_pandas(df, preserve_index=False)
+            print(f"\n--- Processing {filename} ---")
 
             if partition_key:
-                # This file should be partitioned
-                output_path = os.path.join(OUTPUT_PARQUET_DIR, filename.replace('.csv', '.parquet'))
+                # --- THIS IS THE KEY CHANGE: PROCESS IN CHUNKS ---
+                print(f"Reading {filename} in chunks of {chunk_size} rows...")
                 
-                # --- THIS IS THE KEY CHANGE ---
-                # We use the pyarrow function directly to get access to all options
-                pq.write_to_dataset(
-                    table,
-                    root_path=output_path,
-                    partition_cols=[partition_key],
-                    max_partitions=partition_limit # Set the limit here
-                )
+                # Create a reader that yields chunks
+                csv_reader = pd.read_csv(source_path, usecols=cols_to_read, chunksize=chunk_size, low_memory=False)
+                
+                for i, chunk_df in enumerate(csv_reader):
+                    print(f"  -> Processing chunk {i+1}...")
+                    
+                    # Convert this smaller chunk to a PyArrow Table
+                    table = pa.Table.from_pandas(chunk_df, preserve_index=False)
+                    
+                    # Write this chunk to the dataset. PyArrow handles appending to the correct partitions.
+                    pq.write_to_dataset(
+                        table,
+                        root_path=output_path,
+                        partition_cols=[partition_key]
+                        # No need for max_partitions when writing chunk by chunk
+                    )
+                print(f"Finished processing all chunks for {filename}.")
                 # --- END OF CHANGE ---
-
-                print(f"  -> Successfully created partitioned parquet for {filename} partitioned by {partition_key}")
             else:
-                # This file (application_test.csv) should be a single parquet file
-                output_path = os.path.join(OUTPUT_PARQUET_DIR, filename.replace('.csv', '.parquet'))
-                # For single files, df.to_parquet is simple and works fine
+                # For small, non-partitioned files, process them at once.
+                print(f"Reading full file for {filename}...")
+                df = pd.read_csv(source_path, usecols=cols_to_read)
                 df.to_parquet(output_path, engine='pyarrow', index=False)
-                print(f"  -> Successfully created single parquet file for {filename}")
+                print(f"Successfully created single parquet file for {filename}")
 
         except Exception as e:
             print(f"  -> ERROR processing {filename}: {e}")
             traceback.print_exc()
 
 if __name__ == '__main__':
-    # You may need to install these: pip install pandas pyarrow fastparquet
-    print("--- Starting Data Pre-processing to Parquet ---")
+    print("--- Starting Data Pre-processing to Parquet (Chunked Version) ---")
     create_parquet_files()
-    print("--- Pre-processing Complete ---")
+    print("\n--- Pre-processing Complete ---")
