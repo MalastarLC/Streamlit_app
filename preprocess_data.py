@@ -49,6 +49,8 @@ When pandas reads the Parquet file for client 100003, it says:
 import pandas as pd
 import os
 import traceback
+import pyarrow.parquet as pq # Import the pyarrow parquet module directly
+import pyarrow as pa # Import the base pyarrow module
 
 # This script converts the original large CSVs into an efficient, partitioned Parquet format.
 # This only needs to be run ONCE on your local machine.
@@ -58,9 +60,9 @@ SOURCE_DATA_DIR = 'data'
 OUTPUT_PARQUET_DIR = 'data_parquet'
 
 # --- Define the exact columns needed for each file, based on preprocessing_pipeline.py ---
-# These lists are copied directly from your pipeline script to ensure 100% compatibility.
+# (This section remains unchanged)
 REQUIRED_COLUMNS = {
-    'application_test.csv': None, # None means read all columns, as it's small.
+    'application_test.csv': None,
     'bureau.csv': [
        'SK_ID_CURR', 'SK_ID_BUREAU', 'CREDIT_ACTIVE', 'CREDIT_CURRENCY', 'DAYS_CREDIT', 
        'CREDIT_DAY_OVERDUE', 'DAYS_CREDIT_ENDDATE', 'DAYS_ENDDATE_FACT', 'AMT_CREDIT_MAX_OVERDUE', 
@@ -102,10 +104,11 @@ REQUIRED_COLUMNS = {
 }
 
 # --- Define the correct partition key for each file based on the data schema ---
+# (This section remains unchanged)
 PARTITION_KEYS = {
-    'application_test.csv': None, # Not partitioned
+    'application_test.csv': None,
     'bureau.csv': 'SK_ID_CURR',
-    'bureau_balance.csv': 'SK_ID_BUREAU', # Special case, links to bureau.csv
+    'bureau_balance.csv': 'SK_ID_BUREAU',
     'previous_application.csv': 'SK_ID_CURR',
     'POS_CASH_balance.csv': 'SK_ID_CURR',
     'installments_payments.csv': 'SK_ID_CURR',
@@ -122,9 +125,7 @@ def create_parquet_files():
         os.makedirs(OUTPUT_PARQUET_DIR)
         print(f"Created output directory: {OUTPUT_PARQUET_DIR}")
 
-    # Set a generous limit for partitions, high enough for our largest file.
-    # From your log, the largest is ~30177, so 40000 is a safe number.
-    partition_limit = 40000 # On ajoute une limite de partition car sinon on est limité à 1024 (pas assez notre nombre d'ids est bien plus élevé)
+    partition_limit = 40000 
 
     for filename, cols_to_read in REQUIRED_COLUMNS.items():
         try:
@@ -134,23 +135,21 @@ def create_parquet_files():
             print(f"Processing {filename}...")
 
             df = pd.read_csv(source_path, usecols=cols_to_read, low_memory=False)
+            
+            # Convert pandas DataFrame to a PyArrow Table
+            table = pa.Table.from_pandas(df, preserve_index=False)
 
             if partition_key:
                 # This file should be partitioned
                 output_path = os.path.join(OUTPUT_PARQUET_DIR, filename.replace('.csv', '.parquet'))
                 
                 # --- THIS IS THE KEY CHANGE ---
-                # We tell pyarrow it's okay to create many partitions.
-                df.to_parquet(
-                    output_path, 
-                    engine='pyarrow', 
+                # We use the pyarrow function directly to get access to all options
+                pq.write_to_dataset(
+                    table,
+                    root_path=output_path,
                     partition_cols=[partition_key],
-                    # Add dataset options to set the partition limit
-                    use_dictionary=True,
-                    write_statistics=True,
-                    partition_filename_cb=None,
-                    schema=None,
-                    **{'max_partitions': partition_limit} # This is how you pass the option
+                    max_partitions=partition_limit # Set the limit here
                 )
                 # --- END OF CHANGE ---
 
@@ -158,6 +157,7 @@ def create_parquet_files():
             else:
                 # This file (application_test.csv) should be a single parquet file
                 output_path = os.path.join(OUTPUT_PARQUET_DIR, filename.replace('.csv', '.parquet'))
+                # For single files, df.to_parquet is simple and works fine
                 df.to_parquet(output_path, engine='pyarrow', index=False)
                 print(f"  -> Successfully created single parquet file for {filename}")
 
