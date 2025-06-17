@@ -122,6 +122,10 @@ def create_parquet_files():
         os.makedirs(OUTPUT_PARQUET_DIR)
         print(f"Created output directory: {OUTPUT_PARQUET_DIR}")
 
+    # Set a generous limit for partitions, high enough for our largest file.
+    # From your log, the largest is ~30177, so 40000 is a safe number.
+    partition_limit = 40000 # On ajoute une limite de partition car sinon on est limité à 1024 (pas assez notre nombre d'ids est bien plus élevé)
+
     for filename, cols_to_read in REQUIRED_COLUMNS.items():
         try:
             source_path = os.path.join(SOURCE_DATA_DIR, filename)
@@ -134,7 +138,22 @@ def create_parquet_files():
             if partition_key:
                 # This file should be partitioned
                 output_path = os.path.join(OUTPUT_PARQUET_DIR, filename.replace('.csv', '.parquet'))
-                df.to_parquet(output_path, engine='pyarrow', partition_cols=[partition_key])
+                
+                # --- THIS IS THE KEY CHANGE ---
+                # We tell pyarrow it's okay to create many partitions.
+                df.to_parquet(
+                    output_path, 
+                    engine='pyarrow', 
+                    partition_cols=[partition_key],
+                    # Add dataset options to set the partition limit
+                    use_dictionary=True,
+                    write_statistics=True,
+                    partition_filename_cb=None,
+                    schema=None,
+                    **{'max_partitions': partition_limit} # This is how you pass the option
+                )
+                # --- END OF CHANGE ---
+
                 print(f"  -> Successfully created partitioned parquet for {filename} partitioned by {partition_key}")
             else:
                 # This file (application_test.csv) should be a single parquet file

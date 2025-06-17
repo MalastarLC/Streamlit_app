@@ -1,3 +1,7 @@
+#Folders to ignore
+data_parquet/
+
+
 # Data files (ignore all CSVs as requested)
 *.csv
 
