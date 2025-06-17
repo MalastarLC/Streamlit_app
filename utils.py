@@ -21,7 +21,7 @@ import plotly.graph_objects as go
 
 # DATA_PATH = "data/" Plus besoin car on va lire depuis le service S3 de AWS 
 
-S3_BUCKET_NAME = "p8-credit-dashboard-data-paris" # Nom du bucket S3
+S3_BUCKET_NAME = "streamlit-credit-data-bucket-2" # Nom du bucket S3
 
 # API_URL is used by call_prediction_api - better to pass it as an argument from app.py
 
@@ -143,7 +143,7 @@ def load_available_client_ids(app_file_name: str = "application_test.csv") -> li
     """
     # (Function code remains the same, but ensure DATA_PATH is accessible)
     try:
-        s3_path = f"s3://p8-credit-scoring-dashboard-data-2025/data/{app_file_name}"
+        s3_path = f"s3://streamlit-credit-data-bucket-2/data/{app_file_name}"
         # ... rest of the function
         df = pd.read_csv(s3_path, usecols=['SK_ID_CURR'])
         client_ids = sorted(df['SK_ID_CURR'].unique().tolist())
@@ -234,7 +234,7 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
     data_frames_for_payload_preparation = {} # Use a temporary dict to store raw filtered DFs
     client_main_descriptive_df = pd.DataFrame() # This will be current_app
 
-    S3_BUCKET_NAME = "p8-credit-dashboard-data-paris"
+    S3_BUCKET_NAME = "streamlit-credit-data-bucket-2"
     S3_DATA_FOLDER = f"s3://{S3_BUCKET_NAME}/data" # Définir le dossier de base
 
     try:
@@ -242,16 +242,6 @@ def get_data_for_client(client_id: int) -> tuple[dict | None, pd.DataFrame | Non
 
         print("--- DÉBUT: get_data_for_client ---")
         print(f"Bucket S3 utilisé : {S3_BUCKET_NAME}")
-
-        list_of_paths = [
-                        's3://p8-credit-scoring-dashboard-data-2025/data/application_test.csv',
-                        's3://p8-credit-scoring-dashboard-data-2025/data/bureau.csv',
-                        's3://p8-credit-scoring-dashboard-data-2025/data/bureau_balance.csv',
-                        's3://p8-credit-scoring-dashboard-data-2025/data/previous_application.csv',
-                        's3://p8-credit-scoring-dashboard-data-2025/data/POS_CASH_balance.csv',
-                        's3://p8-credit-scoring-dashboard-data-2025/data/installments_payments.csv',
-                        's3://p8-credit-scoring-dashboard-data-2025/data/credit_card_balance.csv'
-                        ]
 
         print("Lecture de application_test.csv depuis S3...")
 
@@ -522,7 +512,7 @@ def load_all_clients_data(app_file_name: str = "application_test.csv"):
         # S'assurer qu'il n'y a pas de doublons
         cols_to_load = list(set(cols_to_load))
 
-        s3_path = f"s3://p8-credit-scoring-dashboard-data-2025/data/{app_file_name}"
+        s3_path = f"s3://streamlit-credit-data-bucket-2/data/{app_file_name}"
         df_all = pd.read_csv(s3_path, usecols=cols_to_load)
 
         # --- Création de features simples pour la comparaison ---
