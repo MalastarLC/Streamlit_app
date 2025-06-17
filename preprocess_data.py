@@ -55,7 +55,7 @@ import pyarrow as pa
 # This is the definitive pre-processing script.
 
 # --- Configuration ---
-SOURCE_DATA_DIR = 'data'
+SOURCE_DATA_DIR = 'data_sample'
 OUTPUT_PARQUET_DIR = 'data_parquet'
 
 # --- Column and Partition Key definitions (Unchanged) ---
