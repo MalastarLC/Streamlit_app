@@ -66,5 +66,6 @@ runtime.txt
 *streamlit_app.py #old version of the app
 *usecols_troubleshooting.py
 *needed_columns_print.py
+*preprocess_data.py
 
 
