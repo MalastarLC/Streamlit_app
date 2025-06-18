@@ -38,5 +38,7 @@ COPY . .
 # Exposer le port sur lequel Streamlit va tourner
 EXPOSE 8501
 
+
 CMD ["streamlit", "run", "streamlit_app_v2.py", "--server.port=8501", "--server.address=0.0.0.0"]
+# CMD ["streamlit", "run", "streamlit_app_v2.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.fileWatcherType=none"]
 # CMD ["streamlit", "run", "streamlit_app_debugging.py", "--server.port=8501", "--server.address=0.0.0.0"]

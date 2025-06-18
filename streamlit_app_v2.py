@@ -21,7 +21,7 @@ from utils import load_available_client_ids, get_data_for_client, call_predictio
 #test commit
 
 API_URL = "https://credit-scoring-api-p5ym.onrender.com/predict"
-DATA_PATH = "data/"
+# DATA_PATH = "data/"
 OPTIMAL_THRESHOLD_SCORE = 63.36
 
 # --- 1. DEFINING NEEDED COLUMNS TO MINIMIZE RAM USAGE ---

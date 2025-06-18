@@ -26,8 +26,10 @@ api_results/
 # Your API receives data via JSON post, it doesn't read from these in production
 # You mentioned .gitignore already handles these, but good to be explicit in .dockerignore too
 data/
+real_data_and_other_data_is_actually_sample/
 *.csv # This will ignore features_manual_and_func_from_first_three_with_app_train.csv (597MB!)
       # and any other CSVs. pipeline_input_columns.txt is a .txt so it's safe.
+*.parquet
 
 # --- Image/Plot Outputs from Notebooks/Analysis ---
 *.png # Ignores confusion_matrix_*.png
